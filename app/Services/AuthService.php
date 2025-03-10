@@ -45,10 +45,6 @@ class AuthService implements AuthServiceInterface
             ])
             ->log('User logged in');
 
-        // $payload->event = 'Login';
-        // $payload->description = 'logged in.';
-        // $this->activityLogRepository->create($payload, $user);
-
         return response()->json([
             'token' => $token,
             // 'user' => new UserResource($user),
