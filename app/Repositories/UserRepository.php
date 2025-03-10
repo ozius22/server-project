@@ -15,7 +15,7 @@ class UserRepository implements UserRepositoryInterface
         //     ->where('email', $email)
         //     ->first();
 
-        return User::where('email', $email)
+        return User::withTrashed()->where('email', $email)
             ->first();
     }
 }

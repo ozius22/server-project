@@ -29,11 +29,21 @@ class AuthService implements AuthServiceInterface
             return $this->errorResponse('exception.invalid_email.message');
         }
 
-        $this->validateUser($user, $payload->password);
-
         // app()->setLocale($user->language->code);
 
+        $this->validateUser($user, $payload->password);
+
         $token = $user->createToken('auth-token')->plainTextToken;
+
+        activity()
+            ->performedOn($user)
+            ->causedBy($user)
+            ->withProperties([
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->header('User-Agent'),
+                'login_time' => now()->toDateTimeString(),
+            ])
+            ->log('User logged in');
 
         // $payload->event = 'Login';
         // $payload->description = 'logged in.';
@@ -94,6 +104,12 @@ class AuthService implements AuthServiceInterface
         if ($user->is_archived) {
             throw ValidationException::withMessages([
                 'message' => trans('exception.archived_user.message'),
+            ]);
+        }
+
+        if ($user->trashed()) {
+            throw ValidationException::withMessages([
+                'message' => trans('exception.deleted_user.message'),
             ]);
         }
     }

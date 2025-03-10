@@ -27,7 +27,7 @@ class User extends Authenticatable
         'phone',
         'birthday',
         'is_active',
-        'date_archived'
+        'date_archived',
     ];
 
     /**
