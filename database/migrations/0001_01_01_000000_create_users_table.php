@@ -23,6 +23,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamp('date_archived')->nullable();
             $table->timestamp('email_verified_at')->nullable();
+            $table->softDeletes();
 
             // Standard Laravel timestamps (created_at and updated_at)
             $table->timestamps();
