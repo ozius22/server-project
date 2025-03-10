@@ -25,29 +25,25 @@ class AuthService implements AuthServiceInterface
     {
         $user = $this->userRepository->findByEmail($payload->email);
 
+        // app()->setLocale($user->language->code);
+
         if (! $user) {
             return $this->errorResponse('exception.invalid_email.message');
         }
-
-        // app()->setLocale($user->language->code);
 
         $this->validateUser($user, $payload->password);
 
         $token = $user->createToken('auth-token')->plainTextToken;
 
-        activity()
-            ->performedOn($user)
-            ->causedBy($user)
-            ->withProperties([
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->header('User-Agent'),
-                'login_time' => now()->toDateTimeString(),
-            ])
-            ->log('User logged in');
+        activity()->event('Login')->performedOn($user)->causedBy($user)->withProperties([
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->header('User-Agent'),
+            'login_time' => now(),
+        ])->log('User logged in');
 
         return response()->json([
             'token' => $token,
-            // 'user' => new UserResource($user),
+            'user' => new UserResource($user),
         ], Response::HTTP_OK);
     }
 

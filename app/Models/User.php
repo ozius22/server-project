@@ -27,7 +27,7 @@ class User extends Authenticatable
         'phone',
         'birthday',
         'is_active',
-        'date_archived',
+        'date_archived_at',
     ];
 
     /**
@@ -47,7 +47,7 @@ class User extends Authenticatable
      */
     protected $casts = [
         'is_active' => 'boolean',
-        'is_archived' => 'boolean',
+        'date_archived_at' => 'boolean',
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
@@ -59,6 +59,6 @@ class User extends Authenticatable
 
     public function getIsArchivedAttribute(): bool
     {
-        return ! is_null($this->date_archived);
+        return ! is_null($this->date_archived_at);
     }
 }

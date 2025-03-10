@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('phone')->nullable();
             $table->date('birthday')->nullable();
             $table->boolean('is_active')->default(true);
-            $table->timestamp('date_archived')->nullable();
+            $table->timestamp('date_archived_at')->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->softDeletes();
 

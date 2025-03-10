@@ -17,7 +17,7 @@ class UserSeeder extends Seeder
 
         foreach ($users as $user) {
             $user->email_verified_at = now();
-            $user->date_archived = null;
+            $user->date_archived_at = null;
             $user->save();
         }
 
@@ -32,7 +32,7 @@ class UserSeeder extends Seeder
                 'phone' => '+639566401574',
                 'birthday' => '2002-09-14',
                 'is_active' => true,
-                'date_archived' => null,
+                'date_archived_at' => null,
             ]
         );
     }
