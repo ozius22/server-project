@@ -10,14 +10,8 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
         'uuid',
         'firstname',
@@ -30,21 +24,10 @@ class User extends Authenticatable
         'date_archived_at',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
         'password',
-        'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected $casts = [
         'is_active' => 'boolean',
         'date_archived_at' => 'boolean',
@@ -61,4 +44,6 @@ class User extends Authenticatable
     {
         return ! is_null($this->date_archived_at);
     }
+
+    public function profile() { return $this->hasOne(Profile::class); }
 }
