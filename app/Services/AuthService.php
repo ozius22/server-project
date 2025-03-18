@@ -5,10 +5,10 @@ namespace App\Services;
 use App\Http\Resources\UserResource;
 use App\Interfaces\Repositories\UserRepositoryInterface;
 use App\Interfaces\Services\AuthServiceInterface;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class AuthService implements AuthServiceInterface
@@ -25,11 +25,13 @@ class AuthService implements AuthServiceInterface
     {
         $user = $this->userRepository->findByEmail($payload->email);
 
-        // app()->setLocale($user->language->code);
-
         if (! $user) {
-            return $this->errorResponse('exception.invalid_email.message');
+            return response()->json([
+                'message' => trans('exception.invalid_email.message'),
+            ], Response::HTTP_BAD_REQUEST);
         }
+
+        // app()->setLocale($user->language->code);
 
         $this->validateUser($user, $payload->password);
 
@@ -76,40 +78,33 @@ class AuthService implements AuthServiceInterface
     private function validateUser($user, $password)
     {
         if (! Hash::check($password, $user->password)) {
-            throw ValidationException::withMessages([
+            throw new HttpResponseException(response()->json([
                 'message' => trans('exception.invalid_password.message'),
-            ]);
+            ], 422));
         }
 
         if (! $user->is_active) {
-            throw ValidationException::withMessages([
+            throw new HttpResponseException(response()->json([
                 'message' => trans('exception.inactive_user.message'),
-            ]);
+            ], 422));
         }
 
         if (! $user->is_email_verified) {
-            throw ValidationException::withMessages([
+            throw new HttpResponseException(response()->json([
                 'message' => trans('exception.unverified_email.message'),
-            ]);
+            ], 422));
         }
 
         if ($user->is_archived) {
-            throw ValidationException::withMessages([
+            throw new HttpResponseException(response()->json([
                 'message' => trans('exception.archived_user.message'),
-            ]);
+            ], 422));
         }
 
         if ($user->trashed()) {
-            throw ValidationException::withMessages([
+            throw new HttpResponseException(response()->json([
                 'message' => trans('exception.deleted_user.message'),
-            ]);
+            ], 422));
         }
-    }
-
-    private function errorResponse(string $messageKey, int $status = Response::HTTP_BAD_REQUEST)
-    {
-        return response()->json([
-            'message' => trans($messageKey),
-        ], $status);
     }
 }
