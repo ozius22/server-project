@@ -1,0 +1,221 @@
+<?php
+
+namespace App\Console\Commands;
+
+use Illuminate\Console\Command;
+use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Str;
+
+class MakeApiScaffoldCommand extends Command
+{
+    /**
+     * Stub for service interface
+     *
+     * @var string
+     */
+    protected const SERVICE_INTERFACE_STUB = <<<'STUB'
+    <?php
+
+    namespace App\Interfaces\Services;
+
+    interface DummyServiceInterface
+    {
+        public function createDummy(object $payload);
+    }
+    STUB;
+
+    /**
+     * Stub for service implementation
+     *
+     * @var string
+     */
+    protected const SERVICE_STUB = <<<'STUB'
+    <?php
+
+    namespace App\Services;
+
+    use App\Interfaces\Services\DummyServiceInterface;
+    use App\Interfaces\Repositories\DummyRepositoryInterface;
+
+    class DummyService implements DummyServiceInterface
+    {
+        private DummyRepositoryInterface $dummyRepository;
+
+        public function __construct(
+            DummyRepositoryInterface $dummyRepository
+        ) {
+            $this->dummyRepository = $dummyRepository;
+        }
+
+        public function createDummy(object $payload)
+        {
+            // …
+        }
+    }
+    STUB;
+
+    /**
+     * Stub for repository interface
+     *
+     * @var string
+     */
+    protected const REPOSITORY_INTERFACE_STUB = <<<'STUB'
+    <?php
+
+    namespace App\Interfaces\Repositories;
+
+    interface DummyRepositoryInterface
+    {
+        public function findByUuid(string $uuid);
+    }
+    STUB;
+
+    /**
+     * Stub for repository implementation
+     *
+     * @var string
+     */
+    protected const REPOSITORY_STUB = <<<'STUB'
+    <?php
+
+    namespace App\Repositories;
+
+    use App\Interfaces\Repositories\DummyRepositoryInterface;
+    use App\Models\Dummy;
+
+    class DummyRepository implements DummyRepositoryInterface
+    {
+        public function findByUuid(string $uuid)
+        {
+            return Dummy::where('uuid', $uuid)->first();
+        }
+    }
+    STUB;
+
+    protected $signature = 'make:api-scaffold 
+                            {name : The base name of the resource (e.g. User, ConsentSession)} 
+                            {--force : Overwrite existing files}';
+
+    protected $description = 'Scaffold a full API (controller, request, resource, service & repo stubs)';
+
+    protected Filesystem $files;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->files = new Filesystem;
+    }
+
+    public function handle()
+    {
+        $base = Str::studly($this->argument('name'));
+
+        $controller = "{$base}Controller";
+        $request = "{$base}StoreRequest";
+        $resource = "{$base}Resource";
+
+        $this->info("Starting API scaffold for {$base}…");
+
+        $this->call('make:controller', [
+            'name' => $controller,
+            '--api' => true,
+            '--force' => $this->option('force'),
+        ]);
+
+        $this->call('make:request', [
+            'name' => $request,
+            '--force' => $this->option('force'),
+        ]);
+
+        $this->call('make:resource', [
+            'name' => $resource,
+            '--force' => $this->option('force'),
+        ]);
+
+        $this->createServiceInterface($base);
+        $this->createService($base);
+        $this->createRepositoryInterface($base);
+        $this->createRepository($base);
+
+        $this->info('Scaffold complete!');
+    }
+
+    protected function createServiceInterface(string $base)
+    {
+        $name = "{$base}ServiceInterface";
+        $subPath = config('api-scaffold.paths.service_interface');
+        $targetDir = app_path($subPath);
+        $targetFile = "{$targetDir}/{$name}.php";
+
+        $this->files->ensureDirectoryExists($targetDir);
+
+        $stub = static::SERVICE_INTERFACE_STUB;
+        $stub = str_replace('DummyServiceInterface', $name, $stub);
+        $stub = str_replace('Dummy', $base, $stub);
+
+        $this->files->put($targetFile, $stub);
+        $this->info("Created interface: {$targetFile}");
+    }
+
+    protected function createService(string $base)
+    {
+        $class = "{$base}Service";
+        $interface = "{$base}ServiceInterface";
+        $repoInterface = "{$base}RepositoryInterface";
+        $repoVariable = lcfirst($base).'Repository';
+
+        $subPath = config('api-scaffold.paths.service');
+        $targetDir = app_path($subPath);
+        $targetFile = "{$targetDir}/{$class}.php";
+
+        $this->files->ensureDirectoryExists($targetDir);
+
+        $stub = static::SERVICE_STUB;
+
+        $stub = str_replace('DummyServiceInterface', $interface, $stub);
+        $stub = str_replace('DummyService', $class, $stub);
+        $stub = str_replace('DummyRepositoryInterface', $repoInterface, $stub);
+
+        $stub = str_replace('dummyRepository', $repoVariable, $stub);
+        $stub = str_replace('Dummy', $base, $stub);
+
+        $this->files->put($targetFile, $stub);
+        $this->info("Created service: {$targetFile}");
+    }
+
+    protected function createRepositoryInterface(string $base)
+    {
+        $name = "{$base}RepositoryInterface";
+        $subPath = config('api-scaffold.paths.repository_interface');
+        $targetDir = app_path($subPath);
+        $targetFile = "{$targetDir}/{$name}.php";
+
+        $this->files->ensureDirectoryExists($targetDir);
+
+        $stub = static::REPOSITORY_INTERFACE_STUB;
+        $stub = str_replace('DummyRepositoryInterface', $name, $stub);
+        $stub = str_replace('Dummy', $base, $stub);
+
+        $this->files->put($targetFile, $stub);
+        $this->info("Created repository interface: {$targetFile}");
+    }
+
+    protected function createRepository(string $base)
+    {
+        $class = "{$base}Repository";
+        $interface = "{$base}RepositoryInterface";
+        $subPath = config('api-scaffold.paths.repository');
+        $targetDir = app_path($subPath);
+        $targetFile = "{$targetDir}/{$class}.php";
+
+        $this->files->ensureDirectoryExists($targetDir);
+
+        $stub = static::REPOSITORY_STUB;
+        $stub = str_replace('DummyRepositoryInterface', $interface, $stub);
+        $stub = str_replace('DummyRepository', $class, $stub);
+        $stub = str_replace('Dummy', $base, $stub);
+
+        $this->files->put($targetFile, $stub);
+        $this->info("Created repository: {$targetFile}");
+    }
+}

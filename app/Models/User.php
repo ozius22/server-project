@@ -45,5 +45,8 @@ class User extends Authenticatable
         return ! is_null($this->date_archived_at);
     }
 
-    public function profile() { return $this->hasOne(Profile::class); }
+    public function profile()
+    {
+        return $this->hasOne(Profile::class);
+    }
 }
