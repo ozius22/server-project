@@ -15,12 +15,16 @@ class MakeApiScaffoldCommand extends Command
      */
     protected const SERVICE_INTERFACE_STUB = <<<'STUB'
     <?php
-
+    
     namespace App\Interfaces\Services;
-
+    
     interface DummyServiceInterface
     {
+        public function listDummy();
         public function createDummy(object $payload);
+        public function getDummy(string $uuid);
+        public function updateDummy(string $uuid, object $payload);
+        public function deleteDummy(string $uuid);
     }
     STUB;
 
@@ -31,25 +35,51 @@ class MakeApiScaffoldCommand extends Command
      */
     protected const SERVICE_STUB = <<<'STUB'
     <?php
-
+    
     namespace App\Services;
-
+    
     use App\Interfaces\Services\DummyServiceInterface;
     use App\Interfaces\Repositories\DummyRepositoryInterface;
-
+    use App\Http\Resources\DummyResource;
+    
     class DummyService implements DummyServiceInterface
     {
         private DummyRepositoryInterface $dummyRepository;
-
+    
         public function __construct(
             DummyRepositoryInterface $dummyRepository
         ) {
             $this->dummyRepository = $dummyRepository;
         }
-
-        public function createDummy(object $payload)
+    
+        public function listDummy()
         {
-            // …
+            $collection = $this->dummyRepository->listAll();
+            return DummyResource::collection($collection);
+        }
+    
+        public function createDummy(object $payload): DummyResource
+        {
+            $model = $this->dummyRepository->create($payload);
+            return new DummyResource($model);
+        }
+    
+        public function getDummy(string $uuid): DummyResource
+        {
+            $model = $this->dummyRepository->findByUuid($uuid);
+            return new DummyResource($model);
+        }
+    
+        public function updateDummy(string $uuid, object $payload): DummyResource
+        {
+            $model = $this->dummyRepository->update($uuid, $payload);
+            return new DummyResource($model);
+        }
+    
+        public function deleteDummy(string $uuid): DummyResource
+        {
+            $model = $this->dummyRepository->delete($uuid);
+            return new DummyResource($model);
         }
     }
     STUB;
@@ -61,12 +91,16 @@ class MakeApiScaffoldCommand extends Command
      */
     protected const REPOSITORY_INTERFACE_STUB = <<<'STUB'
     <?php
-
+    
     namespace App\Interfaces\Repositories;
-
+    
     interface DummyRepositoryInterface
     {
+        public function listAll();
+        public function create(object $payload);
         public function findByUuid(string $uuid);
+        public function update(string $uuid, object $payload);
+        public function delete(string $uuid);
     }
     STUB;
 
@@ -77,17 +111,41 @@ class MakeApiScaffoldCommand extends Command
      */
     protected const REPOSITORY_STUB = <<<'STUB'
     <?php
-
+    
     namespace App\Repositories;
-
+    
     use App\Interfaces\Repositories\DummyRepositoryInterface;
     use App\Models\Dummy;
-
+    
     class DummyRepository implements DummyRepositoryInterface
     {
+        public function listAll()
+        {
+            return Dummy::all();
+        }
+    
+        public function create(object $payload)
+        {
+            return Dummy::create((array) $payload);
+        }
+    
         public function findByUuid(string $uuid)
         {
             return Dummy::where('uuid', $uuid)->first();
+        }
+    
+        public function update(string $uuid, object $payload)
+        {
+            $model = Dummy::where('uuid', $uuid)->firstOrFail();
+            $model->update((array) $payload);
+            return $model;
+        }
+    
+        public function delete(string $uuid)
+        {
+            $model = Dummy::where('uuid', $uuid)->firstOrFail();
+            $model->delete();
+            return $model;
         }
     }
     STUB;
@@ -138,7 +196,7 @@ class MakeApiScaffoldCommand extends Command
         $this->createRepository($base);
         $this->addControllerConstructor($base);
 
-        $this->info('Scaffold complete!');
+        $this->info('Scaffold complete.');
     }
 
     protected function createServiceInterface(string $base)
