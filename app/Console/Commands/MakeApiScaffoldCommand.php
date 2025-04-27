@@ -58,25 +58,25 @@ class MakeApiScaffoldCommand extends Command
             return DummyResource::collection($collection);
         }
     
-        public function createDummy(object $payload): DummyResource
+        public function createDummy(object $payload)
         {
             $model = $this->dummyRepository->create($payload);
             return new DummyResource($model);
         }
     
-        public function getDummy(string $uuid): DummyResource
+        public function getDummy(string $uuid)
         {
             $model = $this->dummyRepository->findByUuid($uuid);
             return new DummyResource($model);
         }
     
-        public function updateDummy(string $uuid, object $payload): DummyResource
+        public function updateDummy(string $uuid, object $payload)
         {
             $model = $this->dummyRepository->update($uuid, $payload);
             return new DummyResource($model);
         }
     
-        public function deleteDummy(string $uuid): DummyResource
+        public function deleteDummy(string $uuid)
         {
             $model = $this->dummyRepository->delete($uuid);
             return new DummyResource($model);
