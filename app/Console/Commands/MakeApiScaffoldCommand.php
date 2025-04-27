@@ -136,6 +136,7 @@ class MakeApiScaffoldCommand extends Command
         $this->createService($base);
         $this->createRepositoryInterface($base);
         $this->createRepository($base);
+        $this->addControllerConstructor($base);
 
         $this->info('Scaffold complete!');
     }
@@ -154,7 +155,7 @@ class MakeApiScaffoldCommand extends Command
         $stub = str_replace('Dummy', $base, $stub);
 
         $this->files->put($targetFile, $stub);
-        $this->info("Created interface: {$targetFile}");
+        $this->info("Created service interface: {$targetFile}");
     }
 
     protected function createService(string $base)
@@ -217,5 +218,55 @@ class MakeApiScaffoldCommand extends Command
 
         $this->files->put($targetFile, $stub);
         $this->info("Created repository: {$targetFile}");
+    }
+
+    protected function addControllerConstructor(string $base)
+    {
+        $controller = "{$base}Controller";
+        $controllerPath = app_path("Http/Controllers/{$controller}.php");
+
+        if (! $this->files->exists($controllerPath)) {
+            return;
+        }
+
+        $content = $this->files->get($controllerPath);
+        $lcBase = lcfirst($base);
+        $serviceInterface = "App\\Interfaces\\Services\\{$base}ServiceInterface";
+
+        if (! Str::contains($content, $serviceInterface)) {
+            $content = preg_replace(
+                '/namespace App\\\\Http\\\\Controllers;(\\r?\\n)/',
+                'namespace App\Http\Controllers;$1use '.$serviceInterface.';$1',
+                $content
+            );
+        }
+
+        $property = "private {$base}ServiceInterface \${$lcBase}Service;\n\n";
+        if (! Str::contains($content, $property)) {
+            $content = preg_replace(
+                '/class '.$controller.' extends Controller\s*\{\r?\n/',
+                "class {$controller} extends Controller\n{\n{$property}",
+                $content
+            );
+        }
+
+        $ctor = <<<PHP
+        public function __construct({$base}ServiceInterface \${$lcBase}Service)
+        {
+            \$this->{$lcBase}Service = \${$lcBase}Service;
+        }\n\n
+        PHP;
+
+        if (! Str::contains($content, 'public function __construct')) {
+            $content = preg_replace(
+                '/\{\r?\n/',
+                "{\n{$ctor}",
+                $content,
+                1
+            );
+        }
+
+        $this->files->put($controllerPath, $content);
+        $this->info("Injected constructor into {$controllerPath}");
     }
 }
