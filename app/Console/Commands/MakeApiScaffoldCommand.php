@@ -258,9 +258,11 @@ class MakeApiScaffoldCommand extends Command
         PHP;
 
         if (! Str::contains($content, 'public function __construct')) {
+            $escapedProperty = preg_quote($property, '/');
+
             $content = preg_replace(
-                '/\{\r?\n/',
-                "{\n{$ctor}",
+                "/({$escapedProperty})/",
+                "$1{$ctor}",
                 $content,
                 1
             );
