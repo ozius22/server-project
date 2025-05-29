@@ -7,6 +7,7 @@ use App\Interfaces\Repositories\ImageRepositoryInterface;
 use App\Interfaces\Services\ImageServiceInterface;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Response;
 
 class ImageService implements ImageServiceInterface
 {
@@ -34,9 +35,10 @@ class ImageService implements ImageServiceInterface
 
     public function scanImage(object $payload)
     {
+        ini_set('max_execution_time', 5400);
+
         $pythonService = 'http://127.0.0.1:5005';
         $uploadDir = storage_path('app/uploaded_faces');
-        $testImagePath = storage_path('app/test_images/test.png');
         $matchedDir = storage_path('app/matched_faces');
         $downloadDir = storage_path('app/downloaded_web_images');
 
@@ -47,17 +49,13 @@ class ImageService implements ImageServiceInterface
         }
 
         $referenceImages = [];
-
         foreach ($payload->file('files') as $uploadedFile) {
             $filename = uniqid('face_').'.'.$uploadedFile->getClientOriginalExtension();
             $fullPath = $uploadDir.'/'.$filename;
-
             $uploadedFile->move($uploadDir, $filename);
-
             if (! file_exists($fullPath)) {
                 throw new \Exception("Failed to save uploaded image: $fullPath");
             }
-
             $referenceImages[] = $fullPath;
         }
 
@@ -76,39 +74,79 @@ class ImageService implements ImageServiceInterface
         $data = json_decode($response->getBody(), true);
 
         if (($data['count'] ?? 0) === 0) {
-            throw new \Exception('No faces recognized in uploaded reference images.');
+            return Response::json(['error' => 'No faces recognized in uploaded reference images.'], 404);
         }
 
-        if (! file_exists($testImagePath)) {
-            throw new \Exception("Test image not found at: $testImagePath");
-        }
-
-        $matchResponse = $client->post("$pythonService/match", [
-            'multipart' => [
-                [
-                    'name' => 'image',
-                    'contents' => fopen($testImagePath, 'r'),
-                    'filename' => basename($testImagePath),
-                ],
-            ],
-        ]);
-
-        $matchData = json_decode($matchResponse->getBody(), true);
-
-        if ($matchData['any_match'] ?? false) {
-            $matchedFilename = uniqid('match_').'_'.basename($testImagePath);
-            $matchedPath = $matchedDir.'/'.$matchedFilename;
-
-            if (! copy($testImagePath, $matchedPath)) {
-                throw new \Exception("Failed to copy matched image to: $matchedPath");
-            }
+        $webUrl = $payload->web_url ?? null;
+        if ($webUrl) {
+            $matches = $this->matchImagesFromWebsite($webUrl, $client, $downloadDir, $matchedDir, $pythonService);
+        } else {
+            $matches = [];
         }
 
         File::cleanDirectory($downloadDir);
+        File::cleanDirectory($uploadDir);
 
         return response()->json([
-            'match_result' => $matchData,
+            'match_result' => $matches,
         ]);
+    }
+
+    protected function matchImagesFromWebsite(string $url, Client $client, string $downloadDir, string $matchedDir, string $pythonService): array
+    {
+        $matches = [];
+
+        try {
+            $res = $client->get($url);
+            $html = (string) $res->getBody();
+            $dom = new \Symfony\Component\DomCrawler\Crawler($html);
+            $imgUrls = $dom->filter('img')->each(fn ($node) => $node->attr('src'));
+
+            foreach ($imgUrls as $imgSrc) {
+                if (empty($imgSrc)) {
+                    continue;
+                }
+
+                $imgSrc = \GuzzleHttp\Psr7\UriResolver::resolve(
+                    new \GuzzleHttp\Psr7\Uri($url),
+                    new \GuzzleHttp\Psr7\Uri($imgSrc)
+                );
+
+                $imgUrl = (string) $imgSrc;
+                $imgName = uniqid('webimg_').'_'.basename(parse_url($imgUrl, PHP_URL_PATH));
+                $imgPath = $downloadDir.'/'.$imgName;
+
+                try {
+                    $client->get($imgUrl, ['sink' => $imgPath]);
+
+                    $matchRes = $client->post("$pythonService/match", [
+                        'multipart' => [
+                            [
+                                'name' => 'image',
+                                'contents' => fopen($imgPath, 'r'),
+                                'filename' => basename($imgPath),
+                            ],
+                        ],
+                    ]);
+
+                    $matchData = json_decode($matchRes->getBody(), true);
+                    if ($matchData['any_match'] ?? false) {
+                        $matchedPath = $matchedDir.'/'.uniqid('match_').'_'.basename($imgPath);
+                        copy($imgPath, $matchedPath);
+                        $matches[] = [
+                            'image' => $imgUrl,
+                            'saved_as' => basename($matchedPath),
+                        ];
+                    }
+                } catch (\Throwable $e) {
+                    continue;
+                }
+            }
+        } catch (\Throwable $e) {
+            return [['error' => 'Failed to crawl: '.$e->getMessage()]];
+        }
+
+        return $matches;
     }
 
     public function getImage(string $uuid)
