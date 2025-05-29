@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\User\CountryController;
+use App\Http\Controllers\Api\User\ImageController;
 use App\Http\Controllers\Api\User\LanguageController;
 use Illuminate\Support\Facades\Route;
 
@@ -12,3 +13,4 @@ Route::prefix('auth')->group(function () {
 
 Route::apiResource('languages', LanguageController::class);
 Route::apiResource('countries', CountryController::class);
+Route::apiResource('images', ImageController::class);
