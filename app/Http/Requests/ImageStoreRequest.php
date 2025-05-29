@@ -22,7 +22,8 @@ class ImageStoreRequest extends FormRequest
     public function rules(): array
     {
         return [
-            //
+            'files' => ['required', 'array', 'min:1'],
+            'files.*' => ['file', 'mimes:jpg,jpeg,png,gif,bmp,svg,webp', 'max:512000'],
         ];
     }
 }
