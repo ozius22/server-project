@@ -89,12 +89,25 @@ class ImageService implements ImageServiceInterface
             $imgUrls = $this->crawlImageUrls($webUrl);
             Log::info('Crawl finished — found '.count($imgUrls).' <img> URLs');
 
-            $imgUrls = array_values(array_unique(array_filter($imgUrls)));
+            $seen = [];
+            $imgUrls = array_filter($imgUrls, function ($item) use (&$seen) {
+                $url = $item['url'] ?? null;
+                if (! $url || isset($seen[$url])) {
+                    return false;
+                }
+                $seen[$url] = true;
+
+                return true;
+            });
+            $imgUrls = array_values($imgUrls);
+
             if (! $imgUrls) {
                 Log::warning('Stage-1 failure: crawler returned nothing');
             }
 
-            foreach ($imgUrls as $imgUrl) {
+            foreach ($imgUrls as $imgData) {
+                $imgUrl = $imgData['url'];
+                $pageUrl = $imgData['page_url'] ?? null;
 
                 $imgName = uniqid('webimg_').'_'.basename(parse_url($imgUrl, PHP_URL_PATH));
                 $imgPath = $downloadDir.'/'.$imgName;
@@ -115,7 +128,8 @@ class ImageService implements ImageServiceInterface
 
                         continue;
                     }
-                    Log::debug('Downloaded '.filesize($imgPath).' bytes ← '.$imgUrl);
+
+                    // Log::debug('Downloaded '.filesize($imgPath).' bytes ← '.$imgUrl);
 
                     $matchRes = $client->post("$pythonService/match", [
                         'multipart' => [[
@@ -124,23 +138,28 @@ class ImageService implements ImageServiceInterface
                             'filename' => $imgName,
                         ]],
                     ]);
+
                     $matchData = json_decode($matchRes->getBody(), true);
 
                     if ($matchData['any_match'] ?? false) {
                         $matchedPath = $matchedDir.'/'.uniqid('match_').'_'.$imgName;
                         copy($imgPath, $matchedPath);
 
+                        Log::info('Match found at page URL', ['url' => $pageUrl]);
+
                         $matches[] = [
                             'image' => $imgUrl,
+                            'page_url' => $pageUrl,
                             'saved_as' => basename($matchedPath),
                         ];
-                    } else {
-                        Log::debug('No face match ← '.$imgUrl);
                     }
                 } catch (\Throwable $e) {
+                    // Log::error('Error during image scan: '.$e->getMessage());
+
                     continue;
                 }
             }
+
         }
 
         File::cleanDirectory($downloadDir);
@@ -156,13 +175,14 @@ class ImageService implements ImageServiceInterface
         $tracker = [];
         $client = new Client(['http_errors' => false, 'timeout' => 15]);
 
-        $addImage = function (string $url) use (&$tracker) {
+        $addImage = function (string $url, ?string $pageUrl = null) use (&$tracker) {
             $key = strtolower($url);
             if (! isset($tracker[$key])) {
                 $tracker[$key] = [
                     'url' => $url,
                     'is_image' => true,
                     'external' => false,
+                    'page_url' => $pageUrl,
                 ];
             }
         };
@@ -182,7 +202,7 @@ class ImageService implements ImageServiceInterface
                     continue;
                 }
                 $resolved = UriResolver::resolve(new Uri($websiteUrl), new Uri($src));
-                $addImage((string) $resolved);
+                $addImage((string) $resolved, $websiteUrl);
             }
         } catch (\Throwable $e) {
         }
@@ -197,7 +217,7 @@ class ImageService implements ImageServiceInterface
             $robots = $client->get("$scheme://$host/robots.txt")->getBody()->getContents();
             if (preg_match_all('/^(?:Allow|Disallow):\s*(\/[^\s]*\.(?:jpe?g|png|webp|gif|bmp))/mi', $robots, $m)) {
                 foreach (array_unique($m[1]) as $path) {
-                    $addImage("$scheme://$host$path");
+                    $addImage("$scheme://$host$path", "$scheme://$host/robots.txt");
                 }
             }
         } catch (\Throwable $e) {
@@ -209,7 +229,7 @@ class ImageService implements ImageServiceInterface
                 foreach ($xml->url ?? [] as $u) {
                     $loc = (string) $u->loc;
                     if (preg_match('/\.(jpe?g|png|webp|gif|bmp)(\?|$)/i', $loc)) {
-                        $addImage($loc);
+                        $addImage($loc, "$scheme://$host/sitemap.xml");
                     }
                 }
             }
@@ -260,6 +280,7 @@ class ImageService implements ImageServiceInterface
                                     'url' => $imgUrl,
                                     'is_image' => true,
                                     'external' => preg_replace('/^www\./i', '', strtolower($url->getHost() ?? '')) !== $this->rootHost,
+                                    'page_url' => (string) $url,
                                 ];
                             }
                         } catch (\Throwable $e) {
@@ -332,10 +353,8 @@ class ImageService implements ImageServiceInterface
             ->setTotalCrawlLimit(500)
             ->startCrawling($websiteUrl);
 
-        return array_values(array_map(
-            fn ($item) => $item['url'],
-            array_filter($tracker, fn ($i) => $i['is_image'] ?? false)
-        ));
+        return array_values(array_filter($tracker, fn ($i) => $i['is_image'] ?? false));
+
     }
 
     public function getImage(string $uuid)
