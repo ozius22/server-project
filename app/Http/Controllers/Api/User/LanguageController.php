@@ -1,17 +1,18 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api\User;
 
-use App\Interfaces\Services\CountryServiceInterface;
+use App\Http\Controllers\Controller;
+use App\Interfaces\Services\LanguageServiceInterface;
 use Illuminate\Http\Request;
 
-class CountryController extends Controller
+class LanguageController extends Controller
 {
-    private CountryServiceInterface $countryService;
+    private LanguageServiceInterface $languageService;
 
-    public function __construct(CountryServiceInterface $countryService)
+    public function __construct(LanguageServiceInterface $languageService)
     {
-        $this->countryService = $countryService;
+        $this->languageService = $languageService;
     }
 
     /**
@@ -19,7 +20,7 @@ class CountryController extends Controller
      */
     public function index()
     {
-        return $this->countryService->listCountry();
+        return $this->languageService->show();
     }
 
     /**
