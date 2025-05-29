@@ -126,7 +126,7 @@ class MakeApiScaffoldCommand extends Command
     
         public function create(object $payload)
         {
-            return Dummy::create((array) $payload);
+            return Dummy::create(get_object_vars($payload));
         }
     
         public function findByUuid(string $uuid)
@@ -137,7 +137,7 @@ class MakeApiScaffoldCommand extends Command
         public function update(string $uuid, object $payload)
         {
             $model = Dummy::where('uuid', $uuid)->firstOrFail();
-            $model->update((array) $payload);
+            $model->update(get_object_vars($payload));
             return $model;
         }
     
@@ -175,7 +175,7 @@ class MakeApiScaffoldCommand extends Command
         $this->info("Starting API scaffold for {$base}…");
 
         $this->call('make:controller', [
-            'name' => $controller,
+            'name' => "Api/User/{$controller}",
             '--api' => true,
             '--force' => $this->option('force'),
         ]);
@@ -281,7 +281,7 @@ class MakeApiScaffoldCommand extends Command
     protected function addControllerConstructor(string $base)
     {
         $controller = "{$base}Controller";
-        $controllerPath = app_path("Http/Controllers/{$controller}.php");
+        $controllerPath = app_path("Http/Controllers/Api/User/{$controller}.php");
 
         if (! $this->files->exists($controllerPath)) {
             return;
@@ -293,8 +293,8 @@ class MakeApiScaffoldCommand extends Command
 
         if (! Str::contains($content, $serviceInterface)) {
             $content = preg_replace(
-                '/namespace App\\\\Http\\\\Controllers;(\\r?\\n)/',
-                'namespace App\Http\Controllers;$1use '.$serviceInterface.';$1',
+                '/namespace App\\\\Http\\\\Controllers\\\\Api\\\\User;(\\r?\\n)/',
+                'namespace App\Http\Controllers\Api\User;$1use '.$serviceInterface.';$1',
                 $content
             );
         }
